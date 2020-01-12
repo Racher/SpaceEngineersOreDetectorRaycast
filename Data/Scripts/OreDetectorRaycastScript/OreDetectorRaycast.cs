@@ -39,14 +39,12 @@ namespace OreDetectorRaycastScript
         static readonly StoredProperty<long> ScanEpochTick = new StoredProperty<long>(
 			"ScanEpoch",
 			false,
-			() => MyAPIGateway.Session.GameDateTime.Ticks,
 			i => i.ToString(),
 			Convert.ToInt64);
 
         static readonly StoredProperty<Vector3D> RaycastTarget = new StoredProperty<Vector3D>(
 			"RaycastTarget",
 			true,
-			() => Vector3D.Zero,
 			v => v.ToString(),
 			s =>
 			{
@@ -58,7 +56,6 @@ namespace OreDetectorRaycastScript
         static readonly StoredProperty<string> OreBlacklist = new StoredProperty<string>(
 			"OreBlacklist",
 			true,
-			() => DefaultOreBlacklist,
 			s => s,
 			s => s);
 
@@ -79,9 +76,10 @@ namespace OreDetectorRaycastScript
                 var detector = Entity as IMyOreDetector;
 
                 materialBlacklist.Clear();
-                foreach (var material in MyDefinitionManager.Static.GetVoxelMaterialDefinitions())
-                    if (OreBlacklist.Contains(material.MinedOre))
-                        materialBlacklist.Add(material);
+                if (OreBlacklist != null)
+                    foreach (var material in MyDefinitionManager.Static.GetVoxelMaterialDefinitions())
+                        if (OreBlacklist.Contains(material.MinedOre))
+                            materialBlacklist.Add(material);
 
                 var voxelMapOverlaps = new List<MyLineSegmentOverlapResult<MyVoxelBase>>();
                 var ray = new LineD(detector.GetPosition(), RaycastTarget);
@@ -136,6 +134,8 @@ namespace OreDetectorRaycastScript
             this.objectBuilder = objectBuilder;
             foreach (var initer in initers)
                 initer(Entity);
+            ScanEpochTick.Set(Entity, MyAPIGateway.Session.GameDateTime.Ticks);
+            OreBlacklist.Set(Entity, DefaultOreBlacklist);
         }
 
         public override MyObjectBuilder_EntityBase GetObjectBuilder(bool copy = false)

@@ -27,15 +27,13 @@ namespace OreDetectorRaycastScript
     {
         readonly Func<T, string> Serialize;
         readonly Func<string, T> Deserialize;
-        readonly T invalid;
         readonly string name;
         readonly Guid guid;
 
-        public StoredProperty(string name, bool ingame, Func<T> GetInitial, Func<T, string> Serialize, Func<string, T> Deserialize)
+        public StoredProperty(string name, bool ingame, Func<T, string> Serialize, Func<string, T> Deserialize)
 		{
             this.Serialize = Serialize;
             this.Deserialize = Deserialize;
-            this.invalid = GetInitial();
             this.name = name;
             guid = Guid.NewGuid();
             try
@@ -46,7 +44,7 @@ namespace OreDetectorRaycastScript
                     {
                         if (Entity.Storage == null)
                             Entity.Storage = new Sandbox.Game.EntityComponents.MyModStorageComponent();
-                        Entity.Storage.Add(guid, Serialize(GetInitial()));
+                        Entity.Storage.Add(guid, Serialize(default(T)));
                     }
                     catch (Exception e)
                     {
@@ -76,7 +74,7 @@ namespace OreDetectorRaycastScript
         public T Get(IMyEntity Entity)
         {
             if (Entity == null || Entity.Storage == null)
-                return invalid;
+                return default(T);
             try
             {
                 return Deserialize(Entity.Storage.GetValue(guid));
@@ -84,7 +82,7 @@ namespace OreDetectorRaycastScript
             catch (Exception e)
             {
                 MyAPIGateway.Utilities.ShowMessage("OreDetectorRaycast", "Exception in StoredProperty.Get " + name + ": " + e.Message);
-                return invalid;
+                return default(T);
             }
         }
 

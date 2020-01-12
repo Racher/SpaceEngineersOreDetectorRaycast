@@ -54,7 +54,7 @@ namespace IngameScript
 				throw new Exception("OreBlacklist inequal");
 			try
 			{
-				detector.SetValue("ScanEpoch", 0);
+				detector.SetValue("ScanEpoch", 0L);
 			}
 			catch
 			{
