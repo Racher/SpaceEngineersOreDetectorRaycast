@@ -29,8 +29,8 @@ namespace OreDetectorRaycastScript
         const double RaycastTimeMultiplier = 2.0 / 10000; //Meter per Tick
         const double AvailableScanRangeMax = 100000.0; //Meter
         const string DefaultOreBlacklist = "Stone";
-        const double VoxelStepMin = 1.0; // Voxel step size close to the detector.
-        const double VoxelStepBase = 1.01; // Voxel test step increases with distance for quicker long range ore scans. Can miss relatively small ore groups.
+        const double VoxelStepConst = 1.0; // Step size constant part.
+        const double VoxelStepBase = 1.01; // Step size exponential base.
 
         public static readonly List<Action<IMyEntity>> initers = new List<Action<IMyEntity>>();
         static readonly HashSet<MyVoxelMaterialDefinition> materialBlacklist = new HashSet<MyVoxelMaterialDefinition>();
@@ -92,9 +92,8 @@ namespace OreDetectorRaycastScript
                 foreach (var voxelMapOverlap in voxelMapOverlaps)
                 {
                     var vMaxDist = Math.Min(maxDist, voxelMapOverlap.Distance + voxelMapOverlap.Element.Size.Length());
-                    var step = VoxelStepMin * voxelMapOverlap.Element.VoxelSize;
-                    var dist0 = voxelMapOverlap.Distance + step * stepOffsetRandom.NextDouble();
-                    for (var dist = dist0; dist < vMaxDist; dist *= VoxelStepBase, dist += step)
+                    var dist0 = voxelMapOverlap.Distance + VoxelStepConst * stepOffsetRandom.NextDouble();
+                    for (var dist = dist0; dist < vMaxDist; dist *= VoxelStepBase, dist += VoxelStepConst)
                     {
                         var testPosition = detector.GetPosition() + dist * ray.Direction;
                         var material = voxelMapOverlap.Element.GetMaterialAt(ref testPosition);
@@ -116,8 +115,8 @@ namespace OreDetectorRaycastScript
 
                 var hitPos = detector.GetPosition() + maxDist * ray.Direction;
                 var ore = hit.GetMaterialAt(ref hitPos).MinedOre;
-                return new MyDetectedEntityInfo(hit.EntityId, ore, MyDetectedEntityType.Unknown,
-                    hitPos, MatrixD.Identity, hit.Physics.LinearVelocity,
+                return new MyDetectedEntityInfo(1, ore, MyDetectedEntityType.Unknown,
+                    hitPos, MatrixD.Identity, Vector3.Zero,
                     MyRelationsBetweenPlayerAndBlock.NoOwnership, BoundingBox.CreateInvalid(), MyAPIGateway.Session.GameDateTime.Ticks);
             }
             catch (Exception e)
