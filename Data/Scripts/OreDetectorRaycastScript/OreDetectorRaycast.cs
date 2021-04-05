@@ -35,6 +35,8 @@ namespace OreDetectorRaycastScript
         public static readonly List<Action<IMyEntity>> initers = new List<Action<IMyEntity>>();
         static readonly HashSet<MyVoxelMaterialDefinition> materialBlacklist = new HashSet<MyVoxelMaterialDefinition>();
         static readonly Random stepOffsetRandom = new Random(0);
+        static readonly List<MyVoxelBase> mVoxels = new List<MyVoxelBase>();
+        static readonly List<MyLineSegmentOverlapResult<MyVoxelBase>> mVoxelMapOverlaps = new List<MyLineSegmentOverlapResult<MyVoxelBase>>();
 
         static readonly StoredProperty<long> ScanEpochTick = new StoredProperty<long>(
 			"ScanEpoch",
@@ -63,6 +65,52 @@ namespace OreDetectorRaycastScript
             "AvailableScanRange", (Entity) =>
             Math.Min(AvailableScanRangeMax, (MyAPIGateway.Session.GameDateTime.Ticks - ScanEpochTick.Get(Entity)) * RaycastTimeMultiplier));
 
+        static readonly ComputedProperty<MyDetectedEntityInfo> DirectResult = new ComputedProperty<MyDetectedEntityInfo>(
+            "DirectResult", (Entity) =>
+        {
+            if (Entity == null)
+                return new MyDetectedEntityInfo();
+            try {
+                var AvailableScanRange = OreDetectorRaycast.AvailableScanRange.Get(Entity);
+                var OreBlacklist = OreDetectorRaycast.OreBlacklist.Get(Entity);
+                var RaycastTarget = OreDetectorRaycast.RaycastTarget.Get(Entity);
+                var detector = Entity as IMyOreDetector;
+
+                var disp = detector.GetPosition() - RaycastTarget;
+                var length = disp.Length();
+                if (AvailableScanRange < length)
+                    return new MyDetectedEntityInfo();
+                mVoxels.Clear();
+                var sphere = new BoundingSphereD(RaycastTarget, 0.1);
+                MyGamePruningStructure.GetAllVoxelMapsInSphere(ref sphere, mVoxels);
+                
+                MyVoxelBase hit = null;
+                MyVoxelMaterialDefinition material = null;
+                foreach (var vox in mVoxels) {
+                    material = vox.GetMaterialAt(ref RaycastTarget);
+                    if (material != null) {
+                        hit = vox;
+                    }
+                }
+
+                var currentChargeTicks = (long)((AvailableScanRange - length) / RaycastTimeMultiplier);
+                ScanEpochTick.Set(Entity, MyAPIGateway.Session.GameDateTime.Ticks - currentChargeTicks);
+                if (hit == null)
+                    return new MyDetectedEntityInfo(0, "", MyDetectedEntityType.None,
+                        null, MatrixD.Identity, Vector3.Zero,
+                        MyRelationsBetweenPlayerAndBlock.NoOwnership, BoundingBox.CreateInvalid(), MyAPIGateway.Session.GameDateTime.Ticks);
+
+                
+                var ore = material.MinedOre;
+                return new MyDetectedEntityInfo(1, ore, MyDetectedEntityType.Unknown,
+                    RaycastTarget, MatrixD.Identity, Vector3.Zero,
+                    MyRelationsBetweenPlayerAndBlock.NoOwnership, BoundingBox.CreateInvalid(), MyAPIGateway.Session.GameDateTime.Ticks);
+            } catch (Exception e) {
+                MyAPIGateway.Utilities.ShowMessage("OreDetectorRaycast", "Exception in GetDirectResult: " + e.Message);
+                return new MyDetectedEntityInfo();
+            }
+        });
+        
         static readonly ComputedProperty<MyDetectedEntityInfo> RaycastResult = new ComputedProperty<MyDetectedEntityInfo>(
             "RaycastResult", (Entity) =>
         {
@@ -81,15 +129,16 @@ namespace OreDetectorRaycastScript
                         if (OreBlacklist.Contains(material.MinedOre))
                             materialBlacklist.Add(material);
 
-                var voxelMapOverlaps = new List<MyLineSegmentOverlapResult<MyVoxelBase>>();
+                
                 var ray = new LineD(detector.GetPosition(), RaycastTarget);
                 ray.Length = Math.Min(AvailableScanRange, ray.Length);
                 ray.To = ray.From + ray.Direction * ray.Length;
-                MyGamePruningStructure.GetVoxelMapsOverlappingRay(ref ray, voxelMapOverlaps);
+                mVoxelMapOverlaps.Clear();
+                MyGamePruningStructure.GetVoxelMapsOverlappingRay(ref ray, mVoxelMapOverlaps);
 
                 MyVoxelBase hit = null;
                 var maxDist = ray.Length;
-                foreach (var voxelMapOverlap in voxelMapOverlaps)
+                foreach (var voxelMapOverlap in mVoxelMapOverlaps)
                 {
                     var vMaxDist = Math.Min(maxDist, voxelMapOverlap.Distance + voxelMapOverlap.Element.Size.Length());
                     var dist0 = voxelMapOverlap.Distance + VoxelStepConst * stepOffsetRandom.NextDouble();
@@ -103,6 +152,9 @@ namespace OreDetectorRaycastScript
                             maxDist = dist;
                             break;
                         }
+                    }
+                    if (hit != null) {
+                        break;
                     }
                 }
 
