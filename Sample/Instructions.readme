@@ -31,6 +31,9 @@ pseudo interface IMyOreDetector
     //!    HitPosition: (absolute world coordinates fluctuating with an inaccuracy of 1m + distance/100) ?? null
     //!    TimeStamp: GameDateTime.Ticks [100ns]
     MyDetectedEntityInfo RaycastResult { get; }
+
+    //! Similar to Raycast but only scan for ore at the end of the ray. Ignores OreBlacklist. Same RaycastTarget and ScanRange cost.
+    MyDetectedEntityInfo DirectResult { get; }
     
     //! Charge that increases by 2km/s consumed by Raycast.
     //! If the requested Raycast target is further, the available charge is used for a shorter ray.
